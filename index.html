@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Visual Cortex v6.5: Educational Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #050505; color: #a3a3a3; overflow: hidden; height: 100vh; display: flex; flex-direction: column; touch-action: none; font-family: 'Courier New', monospace; }
+        canvas { display: block; margin: 0 auto; box-shadow: 0 0 50px rgba(0,0,0,0.9); cursor: crosshair; touch-action: none; }
+        
+        /* UI Elements */
+        .control-panel { 
+            background: #111; 
+            border-top: 1px solid #333; 
+            padding: 0.5rem; 
+            display: flex; 
+            flex-direction: column;
+            gap: 0.5rem; 
+            z-index: 10; 
+        }
+        
+        .row { display: flex; gap: 0.5rem; width: 100%; justify-content: space-between; align-items: center; }
+        
+        .btn { 
+            flex: 1;
+            padding: 0.5rem 0.2rem; 
+            border-radius: 0.25rem; 
+            font-size: 0.7rem;
+            transition: all 0.2s; 
+            border: 1px solid #333; 
+            background: #000; 
+            color: #666; 
+            white-space: nowrap;
+            text-align: center;
+            cursor: pointer;
+        }
+        .btn:hover { border-color: #555; color: #eee; }
+        .btn.active { background: #d97706; color: #fff; border-color: #d97706; box-shadow: 0 0 10px rgba(217, 119, 6, 0.3); }
+        
+        #btn-raw.active { background: #3b82f6; border-color: #3b82f6; }
+        #btn-scan.active { background: #10b981; border-color: #10b981; }
+        #btn-brain.active { background: #8b5cf6; border-color: #8b5cf6; }
+        #btn-illusion.active { background: #ef4444; border-color: #ef4444; color: white; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+
+        .speed-btn { font-size: 0.65rem; padding: 0.4rem 0.1rem; background: #1a1a1a; }
+        .speed-btn.active { background: #ef4444; border-color: #b91c1c; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); color: white; }
+        
+        #debug { position: absolute; bottom: 100px; left: 10px; font-size: 0.7rem; color: #d4d4d4; pointer-events: none; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 4px; border-left: 3px solid #d97706; max-width: 300px;}
+
+        /* --- ONBOARDING STYLES --- */
+        #intro-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #050505;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: opacity 0.5s ease;
+        }
+        
+        .slide-container {
+            width: 100%;
+            max-width: 500px;
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #333;
+            background: #0a0a0a;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        .slide {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            padding: 2rem;
+            display: flex; flex-direction: column; justify-content: center;
+            opacity: 0; pointer-events: none; transform: translateX(50px);
+            transition: all 0.4s ease;
+        }
+        .slide.active { opacity: 1; pointer-events: auto; transform: translateX(0); }
+
+        .slide-graphic {
+            width: 100%; height: 120px; background: #111; margin-bottom: 20px;
+            border: 1px solid #222; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .nav-controls {
+            display: flex; justify-content: space-between; width: 100%; max-width: 500px; margin-top: 20px;
+        }
+        .nav-btn {
+            background: #222; color: #fff; border: 1px solid #444; padding: 10px 20px; cursor: pointer;
+            font-family: inherit; font-size: 0.9rem;
+        }
+        .nav-btn:hover { background: #333; }
+        .start-btn { background: #d97706; border-color: #d97706; color: black; font-weight: bold; }
+        
+        .slide h2 { color: #d97706; font-size: 1.2rem; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        .slide p { font-size: 0.9rem; line-height: 1.5; color: #888; }
+        
+        /* Educational Animations */
+        /* Slide 2: Fovea */
+        .demo-blur-bg { width: 100%; height: 100%; background: radial-gradient(circle, #333 10%, #000 90%); filter: blur(5px); }
+        .demo-fovea { 
+            position: absolute; width: 40px; height: 40px; border-radius: 50%; 
+            background: transparent; border: 2px solid #fff; box-shadow: 0 0 0 1000px rgba(0,0,0,0.7);
+            animation: moveFovea 3s infinite alternate ease-in-out;
+        }
+        @keyframes moveFovea { 0% { left: 20%; top: 20%; } 100% { left: 70%; top: 60%; } }
+
+        /* Slide 3: Saccade */
+        .demo-saccade-dot {
+            width: 10px; height: 10px; background: #ef4444; border-radius: 50%; position: absolute;
+            animation: jumpSaccade 2s infinite steps(1);
+        }
+        @keyframes jumpSaccade {
+            0% { top: 20%; left: 20%; opacity: 1; }
+            20% { opacity: 0; } /* Blind during jump */
+            25% { top: 70%; left: 30%; opacity: 1; }
+            50% { opacity: 0; }
+            55% { top: 40%; left: 80%; opacity: 1; }
+            80% { opacity: 0; }
+            85% { top: 20%; left: 20%; opacity: 1; }
+        }
+
+        /* Slide 5: Warning */
+        .warning-box { border: 2px solid #ef4444; background: rgba(239,68,68,0.1); padding: 15px; margin-top: 10px; }
+        .warning-icon { color: #ef4444; font-size: 2rem; margin-bottom: 10px; display: block; text-align: center;}
+
+        /* --- ILLUSION EXPLAINER OVERLAY --- */
+        #illusion-explainer {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 600px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #ef4444;
+            padding: 15px;
+            border-radius: 8px;
+            color: #ccc;
+            font-size: 0.85rem;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 50;
+            backdrop-filter: blur(4px);
+        }
+        #illusion-explainer h3 { color: #ef4444; margin-bottom: 5px; font-size: 1rem; text-transform: uppercase; }
+
+    </style>
+</head>
+<body>
+
+<div id="intro-overlay">
+    <div class="slide-container">
+        <div class="slide active" id="slide-0">
+            <div class="slide-graphic" style="background: #000;">
+                <h1 style="color: #fff; font-size: 1.5rem;">VISUAL CORTEX v6.5</h1>
+            </div>
+            <h2>Deconstruct Reality</h2>
+            <p>The human eye is not a camera. It is a biological scanner that lies to you constantly.</p>
+            <p>What you perceive as a stable, high-resolution world is actually a stitched-together composite of tiny, jerky snapshots. This simulation breaks down the optical illusion that is your daily reality.</p>
+        </div>
+
+        <div class="slide" id="slide-1">
+            <div class="slide-graphic">
+                <div class="demo-blur-bg"></div>
+                <div class="demo-fovea"></div>
+            </div>
+            <h2>The Hardware (Fovea)</h2>
+            <p>You only have clear vision in a tiny area the size of a pinhead held at arm's length (the fovea). The rest of your vision is a blurry, low-resolution guess.</p>
+            <p>In this app, the <strong>RAW</strong> mode reveals just how little you actually see at any given moment.</p>
+        </div>
+
+        <div class="slide" id="slide-2">
+            <div class="slide-graphic">
+                <div style="color: #333; font-size: 3rem;">text text text</div>
+                <div class="demo-saccade-dot"></div>
+            </div>
+            <h2>The Software (Saccades)</h2>
+            <p>To compensate for poor hardware, your eyes dart around 3 times a second (saccades). During these jumps, you are effectively blind.</p>
+            <p>Your brain deletes these black frames and stitches the static images together in memory to create the illusion of stability.</p>
+        </div>
+
+        <div class="slide" id="slide-3">
+            <div class="slide-graphic" style="flex-direction: column; gap: 5px; align-items: flex-start; padding-left: 20px;">
+                 <div style="color:#3b82f6">1. RAW: The biological input</div>
+                 <div style="color:#10b981">2. SCAN: The path of the eye</div>
+                 <div style="color:#8b5cf6">3. BRAIN: The memory buffer</div>
+                 <div style="color:#ef4444">THE ILLUSION: Real-time speed</div>
+            </div>
+            <h2>Modes of Operation</h2>
+            <p>Use the control panel to strip away the layers of processing your brain performs. </p>
+            <p><strong>The Illusion</strong> button speeds the simulation up to biological speeds, forcing you to see the composite image just like your brain does.</p>
+        </div>
+
+        <div class="slide" id="slide-4">
+            <div class="warning-box">
+                <span class="warning-icon">⚠</span>
+                <h2 style="color: #ef4444; margin-bottom: 5px;">PHOTOSENSITIVITY WARNING</h2>
+                <p style="color: #fff;">This simulation contains <strong>flashing lights</strong> and rapid flickering patterns.</p>
+                <p style="margin-top: 10px; font-size: 0.8rem;">Specifically, the <strong>0.1x Speed</strong> setting utilizes "Black Frame Insertion" to simulate saccadic masking. If you are sensitive to flashing lights or prone to seizures, <strong>DO NOT use the 0.1x speed setting.</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-controls">
+        <button class="nav-btn" onclick="prevSlide()" id="btn-prev" style="opacity: 0; pointer-events: none;">PREVIOUS</button>
+        <div style="display: flex; gap: 5px; align-items: center;">
+            <div class="dot" style="width: 8px; height: 8px; background: #fff; border-radius: 50%;"></div>
+            <div class="dot" style="width: 8px; height: 8px; background: #333; border-radius: 50%;"></div>
+            <div class="dot" style="width: 8px; height: 8px; background: #333; border-radius: 50%;"></div>
+            <div class="dot" style="width: 8px; height: 8px; background: #333; border-radius: 50%;"></div>
+            <div class="dot" style="width: 8px; height: 8px; background: #333; border-radius: 50%;"></div>
+        </div>
+        <button class="nav-btn" onclick="nextSlide()" id="btn-next">NEXT</button>
+    </div>
+</div>
+
+<div id="illusion-explainer">
+    <h3>Constructing Reality</h3>
+    <p>Look closely. The image underneath is actually <strong>Gray and Blurry</strong>.</p>
+    <p style="margin-top: 8px; color: #888;">The simulated fovea (the colored dot) is moving faster than your screen's refresh rate. You see a clear, colored image only because your brain—and the screen's persistence—is stitching these fragments together. You are looking at a lie.</p>
+</div>
+
+<div class="flex-1 flex items-center justify-center relative w-full h-full bg-[#050505] overflow-hidden" id="canvas-container">
+    <canvas id="mainCanvas"></canvas>
+    <div id="debug">
+        <div>STATUS: <span id="status-phase">INITIALIZING</span></div>
+        <div id="status-detail" class="text-xs text-gray-500 mt-1">Awaiting user input...</div>
+    </div>
+</div>
+
+<div class="control-panel border-t border-gray-800">
+    <div class="row">
+        <div class="flex gap-2 flex-1">
+             <button class="btn active" onclick="setScene('image')" id="btn-scene-image">City</button>
+             <button class="btn" onclick="setScene('text')" id="btn-scene-text">Reading</button>
+        </div>
+        <div class="flex gap-2 flex-[1.5]">
+            <button class="btn active" onclick="setMode('raw')" id="btn-raw">1. Raw</button>
+            <button class="btn" onclick="setMode('scan')" id="btn-scan">2. Scan</button>
+            <button class="btn" onclick="setMode('brain')" id="btn-brain">3. Brain</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="flex gap-1 items-center">
+             <button class="btn" style="width: 50px;" onclick="toggleTracker()" id="btn-tracker">Track: OFF</button>
+        </div>
+        <div class="flex gap-1 flex-1">
+            <button class="btn speed-btn" onclick="setSpeed(0.1, this)">0.1x</button>
+            <button class="btn speed-btn" onclick="setSpeed(1.5, this)">Normal</button>
+            <button class="btn speed-btn active" onclick="setSpeed(20.0, this)" style="border-color: #d97706; color: #d97706;">Perceived</button>
+            <button class="btn" onclick="toggleIllusion()" id="btn-illusion" style="border-color: #ef4444; color: #ef4444; font-weight:bold;">The Illusion</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const config = {
+        foveaSize: 80, 
+        parafoveaSize: 180,
+        blindSpotOffset: { x: 110, y: 15 }, 
+        blindSpotSize: 30,
+        saccadeThreshold: 150, 
+        baseImageSrc: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80'
+    };
+
+    // --- ONBOARDING LOGIC ---
+    let currentSlide = 0;
+    const totalSlides = 5;
+
+    function updateSlides() {
+        document.querySelectorAll('.slide').forEach((s, i) => {
+            s.classList.remove('active');
+            if(i === currentSlide) s.classList.add('active');
+        });
+        
+        // Update Dots
+        document.querySelectorAll('.dot').forEach((d, i) => {
+            d.style.background = (i === currentSlide) ? '#fff' : '#333';
+        });
+
+        // Update Buttons
+        const prev = document.getElementById('btn-prev');
+        const next = document.getElementById('btn-next');
+
+        if(currentSlide === 0) {
+            prev.style.opacity = '0'; prev.style.pointerEvents = 'none';
+        } else {
+            prev.style.opacity = '1'; prev.style.pointerEvents = 'auto';
+        }
+
+        if(currentSlide === totalSlides - 1) {
+            next.innerText = "ENTER SIMULATION";
+            next.classList.add('start-btn');
+        } else {
+            next.innerText = "NEXT";
+            next.classList.remove('start-btn');
+        }
+    }
+
+    window.nextSlide = () => {
+        if(currentSlide < totalSlides - 1) {
+            currentSlide++;
+            updateSlides();
+        } else {
+            closeIntro();
+        }
+    };
+
+    window.prevSlide = () => {
+        if(currentSlide > 0) {
+            currentSlide--;
+            updateSlides();
+        }
+    };
+
+    // --- STATE ---
+    let mode = 'raw';
+    let scene = 'image'; 
+    let timeScale = 20.0; 
+    let width = 0, height = 0;
+    let showTracker = false;
+    let illusionActive = false; 
+    let isRunning = false; 
+    
+    // Physics
+    let eye = { x: 0, y: 0, vx: 0, vy: 0 };
+    let target = { x: 0, y: 0 };
+    let isSaccading = false;
+    let fixationTimer = 0;
+    
+    // Scanpath History
+    let scanHistory = []; 
+    const maxHistory = 40; 
+
+    // Reading Logic State
+    let words = [];
+    let currentWordIdx = 0;
+    let smoothedReaderX = 0; 
+    let readingAnchor = 0;
+
+    // Text Content
+    const textContent = `The human eye is not a camera. It is a biological scanner that lies to you constantly. What you perceive as a stable, high-resolution reality is actually a stitched-together composite of tiny, jerky snapshots taken by the fovea—a region of the retina hardly larger than a pinhead. The rest of your vision is a blurry, low-resolution mess, grayscale and filled with holes. 
+
+When you read, your eyes do not glide smoothly across the line. They jump. These jumps, called saccades, are ballistic movements. During a saccade, you are effectively blind. Your brain suppresses the input to prevent motion blur, inserting a "black frame" that it edits out of your memory later. You only see when your eyes stop.
+
+Furthermore, reading is non-linear. You assume you read left to right, but your eyes are constantly regressing, skipping words, checking the end of the sentence for context, and darting back to the beginning. Your brain reassembles these scrambled inputs into a coherent stream of thought. You are not seeing the page; you are hallucinating the page based on sparse data.`;
+
+    const img = new Image();
+    img.src = config.baseImageSrc;
+
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Buffers
+    let sharpCanvas, sharpCtx;
+    let periCanvas, periCtx;
+    let maskCanvas, maskCtx;
+    let memCanvas, memCtx;
+
+    function closeIntro() {
+        document.getElementById('intro-overlay').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('intro-overlay').style.display = 'none';
+        }, 500);
+        isRunning = true;
+        eye.x = width/2; eye.y = height/2;
+    }
+
+    function initBuffers() {
+        const create = () => {
+            const c = document.createElement('canvas');
+            c.width = width;
+            c.height = height;
+            return [c, c.getContext('2d')];
+        };
+        [sharpCanvas, sharpCtx] = create();
+        [periCanvas, periCtx] = create();
+        [maskCanvas, maskCtx] = create();
+        [memCanvas, memCtx] = create();
+    }
+
+    // --- TEXT LAYOUT ENGINE ---
+    function layoutText() {
+        words = [];
+        const fontSize = Math.max(18, width / 35);
+        const lineHeight = fontSize * 1.8;
+        const margin = width * 0.08;
+        
+        sharpCtx.font = `${fontSize}px "Courier New", monospace`;
+        
+        const rawWords = textContent.split(' ');
+        let x = margin;
+        let y = margin + fontSize;
+        let line = 0;
+
+        rawWords.forEach((wordText, i) => {
+            const wMetric = sharpCtx.measureText(wordText + ' ');
+            
+            if (x + wMetric.width > width - margin) {
+                x = margin;
+                y += lineHeight;
+                line++;
+            }
+
+            words.push({
+                text: wordText,
+                x: x,
+                y: y,
+                w: wMetric.width,
+                h: fontSize,
+                cx: x + wMetric.width/2,
+                pvl: x + (wMetric.width * 0.4), 
+                line: line,
+                index: i,
+                length: wordText.replace(/[^a-zA-Z]/g, '').length,
+            });
+
+            x += wMetric.width;
+        });
+        
+        if(words.length > 0) {
+            target.x = words[0].pvl;
+            target.y = words[0].y - words[0].h/3;
+        }
+    }
+
+    // --- DRAWING SCENES TO BUFFERS ---
+    function drawSceneToBuffer(ctxDest, renderMode) {
+        ctxDest.clearRect(0, 0, width, height);
+
+        if (scene === 'image') {
+            if (!img.complete) return;
+            const imgRatio = img.width / img.height;
+            const canvasRatio = width / height;
+            let rw, rh, ox, oy;
+            if (imgRatio > canvasRatio) {
+                rh = height; rw = height * imgRatio; ox = (width - rw)/2; oy = 0;
+            } else {
+                rw = width; rh = width / imgRatio; ox = 0; oy = (height - rh)/2;
+            }
+
+            if (renderMode === 'peripheral_bw') {
+                ctxDest.filter = 'grayscale(100%) blur(8px) opacity(0.8)'; 
+            } else if (renderMode === 'peripheral_color') {
+                ctxDest.filter = 'blur(12px) brightness(1.0)';
+            } else {
+                ctxDest.filter = 'none';
+            }
+            ctxDest.drawImage(img, ox, oy, rw, rh);
+            ctxDest.filter = 'none';
+
+        } else {
+            // TEXT SCENE
+            ctxDest.fillStyle = '#111'; 
+            ctxDest.fillRect(0, 0, width, height);
+
+            if (renderMode === 'peripheral_bw') {
+                ctxDest.filter = 'blur(6px) opacity(30%)'; 
+                ctxDest.fillStyle = '#666'; 
+            } else if (renderMode === 'peripheral_color') {
+                ctxDest.filter = 'blur(5px)'; 
+                ctxDest.fillStyle = '#888'; 
+            } else {
+                ctxDest.filter = 'none';
+                ctxDest.fillStyle = '#e5e5e5';
+            }
+
+            ctxDest.font = `${Math.max(18, width / 35)}px "Courier New", monospace`;
+            ctxDest.textBaseline = 'alphabetic';
+
+            words.forEach(w => {
+                if (renderMode === 'sharp') {
+                    ctxDest.fillStyle = '#e5e5e5';
+                    ctxDest.fillText(w.text, w.x, w.y);
+                } else {
+                    ctxDest.fillText(w.text, w.x, w.y);
+                }
+            });
+            ctxDest.filter = 'none';
+        }
+    }
+
+    function prepareLayers() {
+        const periMode = (mode === 'brain') ? 'peripheral_color' : 'peripheral_bw';
+        drawSceneToBuffer(periCtx, periMode);
+        drawSceneToBuffer(sharpCtx, 'sharp');
+        memCtx.clearRect(0,0,width,height);
+    }
+
+    function resize() {
+        const c = document.getElementById('canvas-container');
+        width = c.clientWidth;
+        height = c.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+        
+        eye.x = width/2; eye.y = height/2;
+        target.x = width/2; target.y = height/2;
+        
+        initBuffers();
+        layoutText();
+        prepareLayers();
+    }
+    
+    window.addEventListener('resize', resize);
+    img.onload = () => { resize(); requestAnimationFrame(loop); };
+
+
+    // --- CONTROLS ---
+    window.setSpeed = (val, btn) => {
+        timeScale = val;
+        illusionActive = false; 
+        document.getElementById('btn-illusion').classList.remove('active');
+        document.getElementById('illusion-explainer').style.opacity = '0'; // Hide explainer
+        document.querySelectorAll('.speed-btn').forEach(b => {
+            b.classList.remove('active');
+            b.style.borderColor = ''; b.style.color = '';
+        });
+        btn.classList.add('active');
+        if(val >= 10) {
+            btn.style.borderColor = '#d97706';
+            btn.style.color = 'white';
+        }
+    };
+
+    window.toggleIllusion = () => {
+        illusionActive = !illusionActive;
+        const btn = document.getElementById('btn-illusion');
+        const explainer = document.getElementById('illusion-explainer');
+        
+        if (illusionActive) {
+            setMode('brain'); 
+            document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            explainer.style.opacity = '1'; // Show Explainer
+            document.getElementById('status-phase').innerText = "REALITY CONSTRUCTION";
+            document.getElementById('status-detail').innerText = "HYPERSPEED SACCADES: 6000/sec";
+            document.getElementById('status-phase').style.color = "#ef4444";
+        } else {
+            btn.classList.remove('active');
+            explainer.style.opacity = '0'; // Hide Explainer
+            setSpeed(1.5, document.querySelectorAll('.speed-btn')[2]); 
+        }
+    }
+
+    window.setScene = (s) => {
+        scene = s;
+        words.forEach(w => w.processed = 0);
+        currentWordIdx = 0;
+        readingAnchor = 0;
+        scanHistory = [];
+        document.querySelectorAll('.btn').forEach(b => {
+            if(b.id.includes('scene')) b.classList.remove('active');
+        });
+        document.getElementById(`btn-scene-${s}`).classList.add('active');
+        prepareLayers();
+    };
+
+    window.setMode = (m) => {
+        mode = m;
+        if (m !== 'brain' && illusionActive) {
+            illusionActive = false;
+            document.getElementById('btn-illusion').classList.remove('active');
+            document.getElementById('illusion-explainer').style.opacity = '0';
+        }
+
+        document.querySelectorAll('.btn').forEach(b => {
+            if(!b.classList.contains('speed-btn') && !b.id.includes('scene') && b.id !== 'btn-tracker' && b.id !== 'btn-illusion') b.classList.remove('active');
+        });
+        document.getElementById(`btn-${m}`).classList.add('active');
+        
+        if (m === 'scan') {
+            showTracker = true;
+            document.getElementById('btn-tracker').innerText = "Track: ON";
+            document.getElementById('btn-tracker').classList.add('active');
+        }
+        
+        prepareLayers();
+    };
+
+    window.toggleTracker = () => {
+        showTracker = !showTracker;
+        const btn = document.getElementById('btn-tracker');
+        btn.innerText = showTracker ? "Track: ON" : "Track: OFF";
+        if(showTracker) btn.classList.add('active'); else btn.classList.remove('active');
+    };
+
+
+    // --- PHYSICS & LOGIC ---
+    function updateEyePhysics() {
+        
+        // 1. PERCEIVED REALITY (The Illusion)
+        if (timeScale >= 10 && !illusionActive) {
+            document.getElementById('status-phase').innerText = "CONSCIOUS PERCEPTION";
+            document.getElementById('status-detail').innerText = "Smoothing over hardware limitations.";
+            document.getElementById('status-phase').style.color = "#f59e0b";
+
+            // --- GHOST TRACKING CALCULATION (SIMULATE THE CHAOS UNDERNEATH) ---
+            if (showTracker && Math.random() > 0.8) {
+                // We create a "phantom" saccade point around the smooth eye position
+                // to show where the eye physically would be darting
+                const ghostX = eye.x + (Math.random()-0.5) * 120;
+                const ghostY = eye.y + (Math.random()-0.5) * 60;
+                scanHistory.push({x: ghostX, y: ghostY, age: 0});
+                if (scanHistory.length > maxHistory) scanHistory.shift();
+            }
+
+            if (scene === 'text' && words.length > 0) {
+                // Smooth glide for text
+                smoothedReaderX += (width * 0.005); 
+                let activeLine = words[currentWordIdx].line;
+                
+                if (smoothedReaderX > width - (width*0.05)) {
+                    smoothedReaderX = width * 0.08;
+                    currentWordIdx = words.findIndex(w => w.line === activeLine + 1);
+                    if (currentWordIdx === -1) { currentWordIdx = 0; smoothedReaderX = words[0].x; }
+                }
+
+                target.x = smoothedReaderX;
+                target.y = words[currentWordIdx].y - 10;
+                
+                eye.x += (target.x - eye.x) * 0.2;
+                eye.y += (target.y - eye.y) * 0.2;
+            } else {
+                const t = Date.now() / 400; 
+                target.x = width/2 + Math.sin(t) * (width * 0.35) + Math.cos(t * 1.7) * 100;
+                target.y = height/2 + Math.cos(t * 0.7) * (height * 0.25) + Math.sin(t * 2.3) * 60;
+                eye.x += (target.x - eye.x) * 0.15;
+                eye.y += (target.y - eye.y) * 0.15;
+            }
+            
+            isSaccading = false;
+            return;
+        }
+
+        // 2. BIOLOGICAL REALITY (Chaos)
+        const dt = 16 * timeScale; 
+        fixationTimer += dt;
+        let fixationDuration = 200 + Math.random() * 150; 
+        
+        if (fixationTimer > fixationDuration) {
+            if (!isSaccading && timeScale < 10) {
+                scanHistory.push({x: eye.x, y: eye.y, age: 0});
+                if (scanHistory.length > maxHistory) scanHistory.shift();
+            }
+
+            if (scene === 'text' && words.length > 0) {
+                decideChaoticReadingTarget();
+            } else {
+                if (Math.random() > 0.7) {
+                    target.x = Math.random() * width;
+                    target.y = Math.random() * height;
+                } else {
+                    target.x += (Math.random()-0.5) * 100;
+                    target.y += (Math.random()-0.5) * 100;
+                }
+            }
+            fixationTimer = 0;
+        }
+
+        const dx = target.x - eye.x;
+        const dy = target.y - eye.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist > 15) {
+            isSaccading = true;
+            eye.x += dx * 0.45;
+            eye.y += dy * 0.45;
+        } else {
+            isSaccading = false;
+            eye.x = target.x; 
+            eye.y = target.y;
+            eye.x += (Math.random()-0.5) * 2;
+            eye.y += (Math.random()-0.5) * 2;
+        }
+        
+        updateStatusText();
+    }
+
+    function decideChaoticReadingTarget() {
+        const roll = Math.random();
+        
+        if (roll < 0.10) {
+            const type = Math.random();
+            if (type < 0.33) {
+                 const lastWord = words[words.length-1];
+                 target.x = lastWord.x;
+                 target.y = lastWord.y;
+                 document.getElementById('status-detail').innerText = "GLOBAL SACCADE: Checking page length";
+            } else if (type < 0.66) {
+                const rWord = words[Math.floor(Math.random() * words.length)];
+                target.x = rWord.x;
+                target.y = rWord.y;
+                document.getElementById('status-detail').innerText = "GLOBAL SACCADE: Sampling context";
+            } else {
+                target.x = words[0].x;
+                target.y = words[0].y;
+                document.getElementById('status-detail').innerText = "GLOBAL SACCADE: Re-anchoring";
+            }
+            return;
+        } 
+        
+        const distToAnchor = Math.abs(currentWordIdx - readingAnchor);
+        if (distToAnchor > 5) {
+            currentWordIdx = readingAnchor;
+        }
+
+        if (roll < 0.20) {
+             let newIdx = Math.max(0, currentWordIdx - Math.floor(Math.random()*3 + 1));
+             currentWordIdx = newIdx;
+             document.getElementById('status-detail').innerText = "REGRESSION: Verifying syntax";
+        } else {
+            currentWordIdx = Math.min(words.length-1, currentWordIdx + 1);
+            if (words[currentWordIdx].length < 4 && Math.random() > 0.5) {
+                currentWordIdx = Math.min(words.length-1, currentWordIdx + 1);
+            }
+            readingAnchor = currentWordIdx; 
+        }
+
+        const t = words[currentWordIdx];
+        target.x = t.pvl + (Math.random() - 0.5) * 15; 
+        target.y = t.y - (t.h * 0.3) + (Math.random() - 0.5) * 5;
+    }
+
+    function updateStatusText() {
+        if(illusionActive) return;
+        const elPhase = document.getElementById('status-phase');
+        if (isSaccading) {
+            elPhase.innerText = "SACCADE";
+            elPhase.style.color = "#ef4444"; 
+        } else {
+            elPhase.innerText = "FIXATION";
+            elPhase.style.color = "#10b981"; 
+        }
+    }
+
+
+    // --- RENDER PIPELINE ---
+    function renderMaskAndMemory() {
+        maskCtx.clearRect(0,0,width,height);
+            
+        // PINHEAD FOVEA
+        // If in Raw or Scan mode, use a tiny radius with a soft gradient
+        // If in Brain/Illusion mode, use the full size to allow painting to work
+        let renderRadius = (mode === 'raw' || mode === 'scan') ? 25 : config.foveaSize;
+
+        const g = maskCtx.createRadialGradient(eye.x, eye.y, 0, eye.x, eye.y, renderRadius);
+        
+        if (mode === 'raw' || mode === 'scan') {
+             // Pinhead: Smooth gradient from center (clear) to edge (transparent)
+             g.addColorStop(0, 'rgba(255,255,255,1)');
+             g.addColorStop(1, 'rgba(255,255,255,0)');
+        } else {
+             // Original Brain Paint Brush
+             g.addColorStop(0, 'rgba(255,255,255,1)');
+             g.addColorStop(0.5, 'rgba(255,255,255,1)');
+             g.addColorStop(1, 'rgba(255,255,255,0)');
+        }
+        
+        maskCtx.fillStyle = g;
+        maskCtx.globalCompositeOperation = 'source-over';
+        maskCtx.fillRect(0,0,width,height);
+        
+        // Re-render sharp text
+        if (scene === 'text') drawSceneToBuffer(sharpCtx, 'sharp');
+
+        maskCtx.globalCompositeOperation = 'source-in';
+        maskCtx.drawImage(sharpCtx.canvas, 0, 0);
+        
+        // Stamp to memory
+        memCtx.globalCompositeOperation = 'source-over';
+        memCtx.drawImage(maskCanvas, 0, 0);
+    }
+
+    function draw() {
+        if (!width) return;
+
+        // 1. Background (Peripheral)
+        ctx.drawImage(periCtx.canvas, 0, 0);
+
+        // 2. Memory Accumulation
+        if (mode === 'brain') {
+            if (!illusionActive) {
+                memCtx.globalCompositeOperation = 'source-over';
+                memCtx.globalAlpha = 0.015; 
+                memCtx.drawImage(periCtx.canvas, 0, 0);
+                memCtx.globalAlpha = 1.0;
+            }
+
+            if ((!isSaccading || illusionActive) && isRunning) {
+                if (!illusionActive) renderMaskAndMemory(); 
+            }
+            ctx.drawImage(memCanvas, 0, 0);
+        }
+
+        // 3. Saccadic Masking (Black Frames)
+        if (timeScale <= 0.5 && isSaccading && mode !== 'brain' && !illusionActive && isRunning) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0,0,width,height);
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '10px monospace';
+            ctx.fillText("INPUT SUPPRESSED", 20, height - 20);
+            return; 
+        }
+
+        // 4. Foveal Construction 
+        if ((!isSaccading || timeScale >= 10) && !illusionActive && isRunning) {
+             if (mode !== 'brain') {
+                renderMaskAndMemory(); 
+                ctx.drawImage(maskCanvas, 0, 0);
+             }
+        } 
+        
+        // 5. Blind Spot
+        if (timeScale < 10 && mode !== 'brain' && !illusionActive && isRunning) {
+            const bx = eye.x + config.blindSpotOffset.x;
+            const by = eye.y + config.blindSpotOffset.y;
+            const bgrad = ctx.createRadialGradient(bx, by, 0, bx, by, config.blindSpotSize);
+            bgrad.addColorStop(0, 'rgba(0,0,0,1)'); 
+            bgrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = bgrad;
+            ctx.fillRect(bx-50, by-50, 100, 100);
+        }
+
+        // 6. Scanpath Tracker (FADING STREAKS)
+        if (showTracker && scanHistory.length > 1) {
+            // Draw trails with fading opacity
+            for(let i=0; i<scanHistory.length-1; i++) {
+                const p1 = scanHistory[i];
+                const p2 = scanHistory[i+1];
+                // Calculate opacity based on index (newer = more opaque)
+                const alpha = (i / scanHistory.length) * 0.8; 
+                
+                ctx.beginPath();
+                ctx.strokeStyle = `rgba(217, 119, 6, ${alpha})`;
+                ctx.lineWidth = 2;
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+
+                // Draw dots
+                if (i % 2 === 0) { 
+                    ctx.fillStyle = `rgba(217, 119, 6, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(p1.x, p1.y, 2, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // 7. Input Reticle
+        if (mode !== 'raw' && timeScale < 10 && !illusionActive) {
+            ctx.strokeStyle = isSaccading ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,0,0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(eye.x, eye.y, 20, 0, Math.PI*2);
+            ctx.stroke();
+        }
+    }
+
+    function loop() {
+        if (isRunning) {
+            if (illusionActive) {
+                // In illusion mode, we jump 50 times a frame
+                for(let i=0; i<50; i++) {
+                    eye.x = Math.random() * width;
+                    eye.y = Math.random() * height;
+                    renderMaskAndMemory();
+                    
+                    // Ghost Tracking in Illusion Mode
+                    if (showTracker && i % 10 === 0) { 
+                        scanHistory.push({x: eye.x, y: eye.y, age: 0});
+                        if(scanHistory.length > maxHistory) scanHistory.shift();
+                    }
+                }
+            } else {
+                updateEyePhysics();
+            }
+        }
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    // Touch
+    canvas.addEventListener('mousemove', e => {
+        if (!isRunning) return;
+        if(mode==='raw' || (timeScale >= 10 && !illusionActive)) { 
+             if (timeScale >= 10) { smoothedReaderX = e.clientX; } 
+             else { target.x = e.clientX; target.y = e.clientY; }
+        }
+    });
+</script>
+
+</body>
+</html>
