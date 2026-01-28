@@ -12,7 +12,10 @@
             background-color: #050505; 
             color: #a3a3a3; 
             overflow: hidden; 
-            height: 100dvh; /* Dynamic Viewport Height fixes the cutoff */
+            /* FIXED: 'position: fixed' + 'inset: 0' locks the viewport on mobile to prevent scroll bounce */
+            position: fixed;
+            inset: 0;
+            height: 100dvh; 
             width: 100vw;
             display: flex; 
             flex-direction: column; 
@@ -259,7 +262,7 @@
     <p style="margin-top: 8px; color: #888;">The simulated fovea (the colored dot) is moving faster than your screen's refresh rate. You see a clear, colored image only because your brain—and the screen's persistence—is stitching these fragments together. You are looking at a lie.</p>
 </div>
 
-<div class="flex-1 flex items-center justify-center relative w-full h-full bg-[#050505] overflow-hidden" id="canvas-container">
+<div class="flex-1 flex items-center justify-center relative w-full min-h-0 bg-[#050505] overflow-hidden" id="canvas-container">
     <canvas id="mainCanvas"></canvas>
     <div id="debug">
         <div>STATUS: <span id="status-phase">INITIALIZING</span></div>
